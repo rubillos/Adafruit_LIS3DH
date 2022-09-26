@@ -134,13 +134,17 @@ bool Adafruit_LIS3DH::begin(uint8_t i2caddr, uint8_t nWAI) {
       i2c_dev, spi_dev, ADDRBIT8_HIGH_TOREAD, LIS3DH_REG_CTRL4, 1);
   _ctrl4.write(0x88); // High res & BDU enabled
 
-  enableDRDY(true, 1);
-
-  // Turn on orientation config
-
   Adafruit_BusIO_Register _tmp_cfg = Adafruit_BusIO_Register(
       i2c_dev, spi_dev, ADDRBIT8_HIGH_TOREAD, LIS3DH_REG_TEMPCFG, 1);
-  _tmp_cfg.write(0x80); // enable adcs
+  _tmp_cfg.write(0x00); // disable adcs
+
+  Adafruit_BusIO_Register _fifo_cfg = Adafruit_BusIO_Register(
+      i2c_dev, spi_dev, ADDRBIT8_HIGH_TOREAD, LIS3DH_REG_FIFOCTRL, 1);
+  _fifo_cfg.write(0x80); // fifo mode to stream
+
+  Adafruit_BusIO_Register _fifo_enable = Adafruit_BusIO_Register(
+      i2c_dev, spi_dev, ADDRBIT8_HIGH_TOREAD, LIS3DH_REG_CTRL5, 1);
+  _fifo_enable.write(0x40); // enable fifo
 
   return true;
 }
@@ -160,11 +164,16 @@ uint8_t Adafruit_LIS3DH::getDeviceID(void) {
  *  @return true if there is new data available, false otherwise
  */
 bool Adafruit_LIS3DH::haveNewData(void) {
-  Adafruit_BusIO_Register status_2 = Adafruit_BusIO_Register(
-      i2c_dev, spi_dev, ADDRBIT8_HIGH_TOREAD, LIS3DH_REG_STATUS2, 1);
-  Adafruit_BusIO_RegisterBits zyx_data_available =
-      Adafruit_BusIO_RegisterBits(&status_2, 1, 3);
-  return zyx_data_available.read();
+  // Adafruit_BusIO_Register status_2 = Adafruit_BusIO_Register(
+  //     i2c_dev, spi_dev, ADDRBIT8_HIGH_TOREAD, LIS3DH_REG_STATUS2, 1);
+  // Adafruit_BusIO_RegisterBits zyx_data_available =
+  //     Adafruit_BusIO_RegisterBits(&status_2, 1, 3);
+  // return zyx_data_available.read();
+  Adafruit_BusIO_Register status_fifo = Adafruit_BusIO_Register(
+      i2c_dev, spi_dev, ADDRBIT8_HIGH_TOREAD, LIS3DH_REG_FIFOSRC, 1);
+  Adafruit_BusIO_RegisterBits fifo_data_available =
+      Adafruit_BusIO_RegisterBits(&status_fifo, 1, 5);
+  return fifo_data_available.read() == 0;
 }
 
 /*!
@@ -208,11 +217,11 @@ void Adafruit_LIS3DH::read(void) {
   uint8_t lsb_value = 1;
   if (range == LIS3DH_RANGE_2_G)
     lsb_value = 4;
-  if (range == LIS3DH_RANGE_4_G)
+  else if (range == LIS3DH_RANGE_4_G)
     lsb_value = 8;
-  if (range == LIS3DH_RANGE_8_G)
+  else if (range == LIS3DH_RANGE_8_G)
     lsb_value = 16;
-  if (range == LIS3DH_RANGE_16_G)
+  else if (range == LIS3DH_RANGE_16_G)
     lsb_value = 48;
   x_g = lsb_value * ((float)x / LIS3DH_LSB16_TO_KILO_LSB10);
   y_g = lsb_value * ((float)y / LIS3DH_LSB16_TO_KILO_LSB10);
